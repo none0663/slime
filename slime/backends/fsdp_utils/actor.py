@@ -4,12 +4,12 @@ from itertools import accumulate
 import ray
 import torch
 import torch.distributed as dist
+import wandb
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp import ShardingStrategy, StateDictType
 from torch_memory_saver import torch_memory_saver
 from transformers import AutoConfig, AutoModelForCausalLM, AutoProcessor, AutoTokenizer
 
-import wandb
 from slime.ray.train_actor import TrainRayActor
 from slime.utils.data import get_minimum_num_micro_batch_size, process_rollout_data
 from slime.utils.distributed_utils import get_gloo_group
@@ -48,7 +48,8 @@ class FSDPTrainRayActor(TrainRayActor):
             if i == dist.get_rank():
                 self.hf_config = AutoConfig.from_pretrained(self.args.hf_checkpoint, trust_remote_code=True)
                 self.tokenizer = AutoTokenizer.from_pretrained(self.args.hf_checkpoint, trust_remote_code=True)
-            dist.barrier(group=get_gloo_group())
+        # Synchronize all processes after the loop
+        dist.barrier(group=get_gloo_group())
 
         if self.args.multimodal_keys:
             self.vlm_processor = AutoProcessor.from_pretrained(self.args.hf_checkpoint, trust_remote_code=True)
